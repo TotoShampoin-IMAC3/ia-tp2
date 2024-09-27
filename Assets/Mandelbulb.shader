@@ -16,11 +16,13 @@ Shader "Unlit/Mandelbuld"
     Properties
     {
         // Color property for material inspector, default to white
-        _Color ("Main Color", Color) = (1,1,1,1)
+        _Color1("Color 1", Color) = (0,0,0,1)
+        _Color2("Color 2", Color) = (1,1,1,1)
+        _Power("Power", Range(1, 10)) = 3
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags {"Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent"}
         LOD 100
         Blend SrcAlpha OneMinusSrcAlpha
         Cull Off
@@ -38,38 +40,94 @@ Shader "Unlit/Mandelbuld"
             };
             struct RayHit {
                 bool hit;
+                int iter;
                 float distance;
                 float3 position;
                 float3 normal;
             };
 
-            struct Object {
-                float3 position;
-                float size;
-            };
-            float SdfSphere(Object s, float3 position) {
-                return length(position - s.position) - s.size;
+            bool IsInCube(float3 p, float3 size) {
+                if(p.x < -size.x || p.x > size.x) return false;
+                if(p.y < -size.y || p.y > size.y) return false;
+                if(p.z < -size.z || p.z > size.z) return false;
+                return true;
             }
 
-            RayHit Raymarch(Ray ray, Object obj) {
+            float _Power;
+            #define SIZE .4
+
+            // https://www.shadertoy.com/view/wstcDN
+            float SdfMandelbulb(float3 position) {
+                float Power = _Power;
+                int steps = 0;
+                float3 pos = position;
+                pos = pos / SIZE;
+                float3 z = pos;
+                float dr = 2.0 / SIZE;
+                float r = 0.0;
+                for (int i = 0; i < 20; i++) { 
+                    r = length(z);
+                    steps = i;
+                    if (r > 4.0) break;
+                    
+                    // convert to polar coordinates
+                    float theta = acos(z.z / r);
+                    float phi = atan2(z.y, z.x);
+                    dr = pow(r, Power - 1.0) * Power * dr + 1.0;
+                    
+                    // scale and rotate the point
+                    float zr = pow(r, Power);
+                    theta = theta * Power;
+                    phi = phi * Power;
+                    
+                    // convert back to cartesian coordinates
+                    z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+                    z += pos;
+                }
+            
+                return 0.5*log(r)*r/dr;
+            }
+
+            float SdfMandelbulbWithNormal(float3 position, inout float3 normal) {
+                float distance = SdfMandelbulb(position);
+
+                float epsilon = 0.001;
+                float3 dx = float3(epsilon, 0.0, 0.0);
+                float3 dy = float3(0.0, epsilon, 0.0);
+                float3 dz = float3(0.0, 0.0, epsilon);
+            
+                float distanceX = SdfMandelbulb(position + dx);
+                float distanceY = SdfMandelbulb(position + dy);
+                float distanceZ = SdfMandelbulb(position + dz);
+            
+                normal = normalize(float3(distanceX - distance, distanceY - distance, distanceZ - distance));
+            
+                return distance;
+            }
+            
+            RayHit Raymarch(Ray ray) {
                 bool hit = false;
                 float distance = 0.0;
                 float3 p = ray.origin;
                 float3 normal = float3(0, 0, 0);
-                for (int i = 0; i < 100; i++) {
+                int i = 0;
+                for (; i < 300; i++) {
                     p = ray.origin + ray.direction * distance;
-                    float d = SdfSphere(obj, p);
+                    float d = SdfMandelbulb(p);
+                    // float d = SdfMandelbulbWithNormal(p, normal);
                     distance += d;
                     if (d < 0.001) {
                         hit = true;
-                        normal = normalize(p - obj.position);
+                        break;
                     }
                 }
                 RayHit hitInfo;
                 hitInfo.hit = hit;
+                hitInfo.iter = i;
                 hitInfo.distance = distance;
                 hitInfo.position = p;
-                hitInfo.normal = mul(UNITY_MATRIX_I_V, normal);
+                // hitInfo.normal = mul(UNITY_MATRIX_I_V, normal);
+                hitInfo.normal = float3(0, 0, 0);
                 return hitInfo;
             }
 
@@ -77,8 +135,7 @@ Shader "Unlit/Mandelbuld"
             {
                 float4 vertex : SV_POSITION;
                 float4 screenPos : TEXCOORD0;
-                float4 objectViewPos : TEXCOORD1;
-                Ray ray : TEXCOORD2;
+                float4 objectWorldPos : TEXCOORD1;
             };
 
             v2f vert (float4 vertex : POSITION)
@@ -86,17 +143,15 @@ Shader "Unlit/Mandelbuld"
                 v2f o;
                 o.vertex = UnityObjectToClipPos(vertex);
                 o.screenPos = ComputeScreenPos(o.vertex);
-                o.objectViewPos = mul(UNITY_MATRIX_MV, float4(0, 0, 0, 1));
+                o.objectWorldPos = mul(UNITY_MATRIX_M, float4(0, 0, 0, 1));
                 return o;
             }
 
-            fixed4 _Color;
+            fixed4 _Color1;
+            fixed4 _Color2;
 
             fixed4 frag (v2f i) : SV_Target
             {
-                float time = _Time.y;
-                float4 res = _ScreenParams;
-                float3 lightViewDir = _WorldSpaceLightPos0;
                 float near = _ProjectionParams.y;
                 float far = _ProjectionParams.z;    
 
@@ -104,19 +159,18 @@ Shader "Unlit/Mandelbuld"
 
                 float4 color = float4(0., 0., 0., 0.);
 
-                Object obj;
-                obj.position = i.objectViewPos.xyz;
-                obj.size = .5;
+                float4x4 invMVP = mul(unity_WorldToObject, mul(UNITY_MATRIX_I_V, unity_CameraInvProjection));   
 
                 Ray ray;
-                ray.origin = mul(unity_CameraInvProjection, float4(uv, -1, 1) * near).xyz;
-                ray.direction = mul(unity_CameraInvProjection, float4(uv * (far - near), far + near, far - near)).xyz;
+                ray.origin = mul(invMVP, float4(uv, -1, 1) * near).xyz;
+                ray.direction = mul(invMVP, float4(uv * (far - near), far + near, far - near)).xyz;
                 ray.direction = normalize(ray.direction);
 
-                RayHit hit = Raymarch(ray, obj);
+                RayHit hit = Raymarch(ray);
 
                 if(hit.hit) {
-                    color.rgb = dot(hit.normal, lightViewDir);
+                    float t = hit.iter / 300.;
+                    color.rgb = lerp(_Color1, _Color2, t);
                     color.a += 1.;
                 } else {
                     color = 0.;
