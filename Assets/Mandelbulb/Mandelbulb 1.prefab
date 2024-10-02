@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 2188536685654598199}
   - component: {fileID: 3932733285850769158}
   - component: {fileID: 2644126431067981697}
-  - component: {fileID: 8087796323951084465}
+  - component: {fileID: 974886724000375323}
   - component: {fileID: 8240668485290870486}
   m_Layer: 0
   m_Name: Mandelbulb 1
@@ -42,7 +42,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4423861653012863704}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!23 &2644126431067981697
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -85,8 +85,8 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &8087796323951084465
-BoxCollider:
+--- !u!135 &974886724000375323
+SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -104,7 +104,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
+  m_Radius: 0.5000001
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!54 &8240668485290870486
 Rigidbody:
