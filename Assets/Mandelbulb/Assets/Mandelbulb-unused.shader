@@ -88,6 +88,98 @@ Shader "Unlit/Mandelbuld"
             
                 return 0.5*log(r)*r/dr;
             }
+
+            float SdfMandelbulbWithNormal(float3 position, inout float3 normal) {
+                float distance = SdfMandelbulb(position);
+
+                float epsilon = 0.00001;
+                float3 dx = float3(epsilon, 0.0, 0.0);
+                float3 dy = float3(0.0, epsilon, 0.0);
+                float3 dz = float3(0.0, 0.0, epsilon);
+            
+                float distanceX = SdfMandelbulb(position + dx);
+                float distanceY = SdfMandelbulb(position + dy);
+                float distanceZ = SdfMandelbulb(position + dz);
+            
+                normal = normalize(float3(distanceX - distance, distanceY - distance, distanceZ - distance));
+            
+                return distance;
+            }
+
+            void SdfMandelbulbIteration(int steps, float3 pos, float Power, inout float3 z, inout float dr) {
+                float r = length(z);
+                if (r > 4.0) return;
+                
+                // convert to polar coordinates
+                float theta = acos(z.z / r);
+                float phi = atan2(z.y, z.x);
+                dr = pow(r, Power - 1.0) * Power * dr + 1.0;
+                
+                // scale and rotate the point
+                float zr = pow(r, Power);
+                theta = theta * Power;
+                phi = phi * Power;
+                
+                // convert back to cartesian coordinates
+                z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+                z += pos;
+            }
+
+            float SdfMandelbulbIteratedWithNormal(float3 position, inout float3 normal) {
+                float Power = _Power;
+                // int steps = 0;   
+                float3 pos = position;
+                pos = pos / _Size;
+                float3 z = pos;
+                float dr = 2.0 / _Size;
+                float r = 0.0;
+
+                float epsilon = 0.001;
+                float3 dx = float3(epsilon, 0.0, 0.0);
+                float3 dy = float3(0.0, epsilon, 0.0);
+                float3 dz = float3(0.0, 0.0, epsilon);
+
+                float3 zx = z + dx;
+                float3 zy = z + dy;
+                float3 zz = z + dz;
+
+                float drx = 0.0;
+                float dry = 0.0;
+                float drz = 0.0;
+
+                for (int i = 0; i < _MandelIter; i++) { 
+                    SdfMandelbulbIteration(i, pos, Power, z, dr);
+                    SdfMandelbulbIteration(i, pos + dx, Power, zx, drx);
+                    SdfMandelbulbIteration(i, pos + dy, Power, zy, dry);
+                    SdfMandelbulbIteration(i, pos + dz, Power, zz, drz);
+                    // r = length(z);
+                    // steps = i;
+                    // if (r > 4.0) break;
+                    
+                    // // convert to polar coordinates
+                    // float theta = acos(z.z / r);
+                    // float phi = atan2(z.y, z.x);
+                    // dr = pow(r, Power - 1.0) * Power * dr + 1.0;
+                    
+                    // // scale and rotate the point
+                    // float zr = pow(r, Power);
+                    // theta = theta * Power;
+                    // phi = phi * Power;
+                    
+                    // // convert back to cartesian coordinates
+                    // z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
+                    // z += pos;
+                }
+
+                float distance = 0.5*log(r)*r/dr;
+                float distanceX = 0.5*log(length(zx))*length(zx)/drx;
+                float distanceY = 0.5*log(length(zy))*length(zy)/dry;
+                float distanceZ = 0.5*log(length(zz))*length(zz)/drz;
+
+                normal = normalize(float3(distanceX - distance, distanceY - distance, distanceZ - distance));
+
+                return distance;
+            }
             
             RayHit Raymarch(Ray ray) {
                 bool hit = false;
@@ -98,6 +190,7 @@ Shader "Unlit/Mandelbuld"
                 for (; i < _RaymarchIter; i++) {
                     p = ray.origin + ray.direction * distance;
                     float d = SdfMandelbulb(p);
+                    // float d = SdfMandelbulbWithNormal(p, normal);
                     distance += d;
                     if (d < 0.001) {
                         hit = true;
@@ -109,6 +202,7 @@ Shader "Unlit/Mandelbuld"
                 hitInfo.iter = i;
                 hitInfo.distance = distance;
                 hitInfo.position = p;
+                // hitInfo.normal = normal;
                 hitInfo.normal = normalize(p);
                 return hitInfo;
             }
@@ -162,7 +256,7 @@ Shader "Unlit/Mandelbuld"
 
                 if(hit.hit) {
                     float t = hit.iter / 300.;
-                    float lambertian = dot(normal, light_dir.xyz) * 0.5 + 0.6;
+                    float lambertian = dot(normal, light_dir.xyz) * 0.5 + 0.5;
                     color.rgb = lerp(_Color1, _Color2, pow(t, _Gamma)) * lambertian;
                     // color.rgb = lerp(_Color1, _Color2, pow(t, 1/2.2)) * lambertian;
                     // color.rgb = dot(normal, light_dir) * _Color1.rgb;

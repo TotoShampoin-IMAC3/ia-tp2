@@ -65,20 +65,23 @@ Material:
     - _ColorMask: 15
     - _Culling: 2
     - _Cutoff: 0.5
+    - _DR: 6.08
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
+    - _Gamma: 0.514
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _MandelIter: 20
+    - _MandelIter: 8
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Offset: 0
     - _Parallax: 0.02
-    - _Power: 10
+    - _Power: 4.91
     - _RaymarchIter: 150
     - _ReadMask: 255
+    - _Size: 0.296
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
@@ -93,8 +96,8 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 0, b: 0, a: 1}
-    - _Color1: {r: 0.9009434, g: 0.94220096, b: 1, a: 1}
-    - _Color2: {r: 0.2735849, g: 0, b: 0.13151526, a: 1}
+    - _Color1: {r: 0, g: 1, b: 0.93012977, a: 1}
+    - _Color2: {r: 0.0631013, g: 0, b: 0.5471698, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _Position: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
