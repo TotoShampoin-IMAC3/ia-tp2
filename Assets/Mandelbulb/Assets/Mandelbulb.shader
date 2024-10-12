@@ -11,11 +11,17 @@ Shader "Unlit/Mandelbuld"
         // Color property for material inspector, default to white
         _Color1("Color 1", Color) = (0,0,0,1)
         _Color2("Color 2", Color) = (1,1,1,1)
+        // Changes how the color is interpolated
         _Gamma("Gamma", Range(0, 1)) = 1
+        // Size of the bulb
         _Size("Size", Range(0, 1)) = .4
+        // Shape of the bulb
         _Power("Power", Range(1, 10)) = 3
+        // Number of steps to take when raymarching
         _RaymarchIter("RaymarchIter", Range(1, 500)) = 300
+        // Number of steps to take when calculating the mandelbulb
         _MandelIter("MandelIter", Range(1, 50)) = 20
+        // Distance estimate; It makes the bulb thicker, but allows the camera to be further away without the thing disappearing
         _DR("DR", Range(1, 10)) = 6.
     }
     SubShader
@@ -43,13 +49,6 @@ Shader "Unlit/Mandelbuld"
                 float3 position;
                 float3 normal;
             };
-
-            bool IsInCube(float3 p, float3 size) {
-                if(p.x < -size.x || p.x > size.x) return false;
-                if(p.y < -size.y || p.y > size.y) return false;
-                if(p.z < -size.z || p.z > size.z) return false;
-                return true;
-            }
 
             float _Power;
             float _RaymarchIter;
@@ -142,14 +141,16 @@ Shader "Unlit/Mandelbuld"
 
                 float4 color = float4(0., 0., 0., 0.);
 
+                // Inverse MVP, to apply on the rays
                 float4x4 invMV = mul(unity_WorldToObject, UNITY_MATRIX_I_V);
                 float4x4 invMVP = mul(unity_WorldToObject, mul(UNITY_MATRIX_I_V, unity_CameraInvProjection));
 
-                // float4 light_dir = unity_LightPosition[0];
+                // The main light, to make the bulb fit ever so slightly into the scene
                 float4 light_dir = _WorldSpaceLightPos0;
                 light_dir = mul(UNITY_MATRIX_V, light_dir);
                 light_dir = normalize(light_dir);
 
+                // The ray to be cast, from the camera to the pixel
                 Ray ray;
                 ray.origin = mul(invMVP, float4(uv, -1, 1) * near).xyz;
                 ray.direction = mul(invMVP, float4(uv * (far - near), far + near, far - near)).xyz;
@@ -164,9 +165,6 @@ Shader "Unlit/Mandelbuld"
                     float t = hit.iter / 300.;
                     float lambertian = dot(normal, light_dir.xyz) * 0.5 + 0.6;
                     color.rgb = lerp(_Color1, _Color2, pow(t, _Gamma)) * lambertian;
-                    // color.rgb = lerp(_Color1, _Color2, pow(t, 1/2.2)) * lambertian;
-                    // color.rgb = dot(normal, light_dir) * _Color1.rgb;
-                    // color.rgb = hit.normal;
                     color.a = 1.;
                 } else {
                     color = 0.;
@@ -178,6 +176,7 @@ Shader "Unlit/Mandelbuld"
         }
 
 		// Pass to render object as a shadow caster
+        // I'd have loved the shadow to be in the shape of the bulb, but instead, it's just the sphere that contains it
 		Pass 
 		{
 			Name "CastShadow"

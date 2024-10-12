@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// A simple camera control script
 public class cam : MonoBehaviour
 {
     public Transform target;
